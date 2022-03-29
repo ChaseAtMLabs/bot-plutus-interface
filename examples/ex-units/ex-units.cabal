@@ -23,14 +23,13 @@ source-repository head
 common common-lang
   ghc-options:
     -Wall -Wcompat -Wincomplete-record-updates
-    -Wincomplete-uni-patterns -Wredundant-constraints -Werror
+    -Wincomplete-uni-patterns -Wredundant-constraints 
+    -- -Werror
     -fobject-code -fno-ignore-interface-pragmas
-    -fno-omit-interface-pragmas -fplugin=RecordDotPreprocessor
+    -fno-omit-interface-pragmas -Wunused-packages
 
   build-depends:
     , base                     ^>=4.14
-    , record-dot-preprocessor
-    , record-hasfield
 
   default-extensions:
     NoImplicitPrelude
@@ -64,6 +63,8 @@ common common-lang
     TypeOperators
     TypeSynonymInstances
     UndecidableInstances
+    TemplateHaskell
+    TypeFamilies
 
   default-language:   Haskell2010
 
@@ -72,68 +73,40 @@ common common-lang
 
 library
   import:          common-lang
-  exposed-modules: Cardano.PlutusExample.NFT
+  exposed-modules: LockSpend
   build-depends:
-    , aeson                      ^>=1.5.0.0
-    , attoparsec                 >=0.13.2.2
-    , bytestring                 ^>=0.10.12.0
-    , cardano-api
-    , cardano-crypto
-    , cardano-ledger-alonzo
+      plutus-ledger
     , containers
-    , data-default
-    , data-default-class
-    , directory
-    , either
-    , filepath
-    , freer-extras
-    , freer-simple
-    , http-client
-    , http-types
-    , lens
-    , memory
-    , playground-common
-    , plutus-chain-index
-    , plutus-chain-index-core
     , plutus-contract
-    , plutus-core
-    , plutus-ledger
     , plutus-ledger-api
     , plutus-ledger-constraints
     , plutus-pab
     , plutus-tx
     , plutus-tx-plugin
-    , process
-    , row-types
-    , serialise
-    , servant
-    , servant-client
-    , servant-server
-    , servant-websockets
-    , split
-    , stm
-    , text                       ^>=1.2.4.0
-    , transformers
-    , transformers-either
-    , uuid
-    , wai
-    , warp
-    , websockets
+    , text
+
+    
 
   hs-source-dirs:  src
 
 executable ex-units-run
   import:         common-lang
   build-depends:
-    , aeson                 ^>=1.5.0.0
+      aeson                 ^>=1.5.0.0
     , bot-plutus-interface
-    , bytestring
     , cardano-api
     , data-default
-    , playground-common
-    , plutus-ledger
     , ex-units
-    , servant-client-core
+    , servant-client
+    , filepath
+    , text
+    , directory
+    , plutus-ledger
+    , plutus-tx
+    , uuid
+    , stm
+    , plutus-pab
+    , plutus-contract
 
   main-is:        Main.hs
   hs-source-dirs: app

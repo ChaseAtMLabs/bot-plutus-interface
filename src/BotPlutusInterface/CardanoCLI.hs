@@ -101,6 +101,7 @@ import PlutusTx.AssocMap qualified as AMap
 import PlutusTx.Builtins (fromBuiltin)
 import PlutusTx.Prelude qualified as PPrelude
 import Prelude
+import Debug.Trace (trace)
 
 -- | Getting information of the latest block
 queryTip ::
@@ -499,6 +500,7 @@ valueToCliArg val =
 
 unsafeSerialiseAddress :: NetworkId -> Address -> Text
 unsafeSerialiseAddress network address =
+  trace ("Addr: " ++ show address) $
   case serialiseAddress <$> toCardanoAddress network address of
     Right a -> a
     Left _ -> error "Couldn't create address"

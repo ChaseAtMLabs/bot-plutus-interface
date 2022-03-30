@@ -8,7 +8,7 @@ import Prelude
 import Ledger (PubKeyHash(PubKeyHash))
 import BotPlutusInterface.Contract qualified as BPI
 import BotPlutusInterface.QueryNode qualified as BPI
-import BotPlutusInterface.Types 
+import BotPlutusInterface.Types
 
 import Cardano.Api.Shelley (ProtocolParameters)
 import Cardano.Api (NetworkId (Mainnet))
@@ -27,6 +27,9 @@ import LockSpend (lockThenSpend)
 import System.Environment (getArgs, setEnv)
 import qualified Data.Text as Text
 import Wallet.Types (ContractInstanceId (ContractInstanceId))
+import Cardano.Api qualified as CAPI
+import Data.Aeson ((.=))
+import Data.Text (Text)
 
 main :: IO ()
 main = do
@@ -34,6 +37,7 @@ main = do
   let clusterDir = "/home/mike/dev/mlabs/local-cluster/data"
   [sockPath] <- getArgs
   setEnv "CARDANO_NODE_SOCKET_PATH" sockPath
+  print $ JSON.encode (PubKeyHash "ffff")
   let nodeInfo = BPI.NodeInfo Mainnet sockPath
 
   cEnv <- mkContractEnv nodeInfo clusterDir
@@ -53,7 +57,7 @@ mkContractEnv nodeInfo clusterDir = do
               }
 
 getPparams nodeInfo clusterDir = do
-  pparams :: ProtocolParameters <- getOrFail <$> BPI.queryProtocolParams nodeInfo
+  pparams :: ProtocolParameters <- getOrFailM $ BPI.queryProtocolParams nodeInfo
   let ppath = clusterDir </> "pparams.json"
   JSON.encodeFile ppath pparams
   return (pparams, ppath)
@@ -68,7 +72,7 @@ mkPabConf pparams pparamsFile clusterDir ownPkh =
     , pcProtocolParams = pparams
     , pcTipPollingInterval = 1_000_000
     , pcSlotConfig = def
-    , pcOwnPubKeyHash = "a696c591f6d77c164262aa93821483713575375c39c5ca14f3a493d8" -- FIXME: parsing key hash
+    , pcOwnPubKeyHash = ownPkh
     , pcScriptFileDir = Text.pack$ clusterDir </> "bot-plutus-interface/scripts"
     , pcSigningKeyFileDir = Text.pack$ clusterDir </> "bot-plutus-interface/signing-keys"
     , pcTxFileDir = Text.pack$ clusterDir </> "bot-plutus-interface/txs"
@@ -79,15 +83,26 @@ mkPabConf pparams pparamsFile clusterDir ownPkh =
     , pcEnableTxEndpoint = True
     }
 
+getPkhs :: FilePath -> IO [PubKeyHash]
 getPkhs bpiDir = do
   let dir = bpiDir </> "bot-plutus-interface/signing-keys"
-      replace = PubKeyHash
-                . stringToBuiltinByteString
-                . Text.unpack
+      replace = Text.unpack
                 . Text.replace "signing-key-" ""
                 . Text.replace ".skey" ""
                 . Text.pack
   keyNames <- listDirectory dir
-  return $ map replace keyNames
+  return $ map (parseKey . replace) keyNames
+  where
+    parseKey :: String -> PubKeyHash
+    parseKey key = 
+      let
+        res = JSON.fromJSON $ JSON.object ["getPubKeyHash" .= key ]
+      in case res of
+        JSON.Success pkh -> pkh
+        _ -> error "failed to parse pkh"
 
+getOrFail :: Show e => Either e a -> a
 getOrFail = either (error . show) id
+
+getOrFailM :: (Show e, Functor f) => f (Either e b) -> f b
+getOrFailM = (getOrFail <$>)

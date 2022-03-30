@@ -25,7 +25,8 @@ source-repository head
 common common-lang
   ghc-options:
     -Wall -Wcompat -Wincomplete-record-updates
-    -Wincomplete-uni-patterns -Wredundant-constraints -Werror
+    -Wincomplete-uni-patterns -Wredundant-constraints 
+    -- -Werror
     -fobject-code -fno-ignore-interface-pragmas
     -fno-omit-interface-pragmas -fplugin=RecordDotPreprocessor
 
@@ -86,6 +87,8 @@ library
     BotPlutusInterface.UtxoParser
     BotPlutusInterface.Server
     BotPlutusInterface.QueryNode
+    BotPlutusInterface.TxBudget
+
   build-depends:
     , aeson                      ^>=1.5.0.0
     , attoparsec                 >=0.13.2.2
@@ -136,6 +139,7 @@ library
     , wai
     , warp
     , websockets
+    , cardano-slotting
 
   hs-source-dirs:  src
 

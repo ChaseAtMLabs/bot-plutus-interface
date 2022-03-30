@@ -500,7 +500,6 @@ valueToCliArg val =
 
 unsafeSerialiseAddress :: NetworkId -> Address -> Text
 unsafeSerialiseAddress network address =
-  trace ("Addr: " ++ show address) $
   case serialiseAddress <$> toCardanoAddress network address of
     Right a -> a
     Left _ -> error "Couldn't create address"

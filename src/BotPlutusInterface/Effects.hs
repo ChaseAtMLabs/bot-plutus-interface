@@ -19,14 +19,14 @@ module BotPlutusInterface.Effects (
   writeFileJSON,
   writeFileTextEnvelope,
   callCommand,
-) where
+estimateBudget) where
 
 import BotPlutusInterface.ChainIndex (handleChainIndexReq)
 import BotPlutusInterface.Types (
   CLILocation (..),
   ContractEnvironment,
   ContractState (ContractState),
-  LogLevel (..),
+  LogLevel (..), PABConfig (PABConfig)
  )
 import Cardano.Api (AsType, FileError, HasTextEnvelope, TextEnvelopeDescr, TextEnvelopeError)
 import Cardano.Api qualified
@@ -48,6 +48,7 @@ import System.Directory qualified as Directory
 import System.Exit (ExitCode (ExitFailure, ExitSuccess))
 import System.Process (readProcess, readProcessWithExitCode)
 import Prelude hiding (readFile)
+import BotPlutusInterface.TxBudget qualified as TxBudget
 
 data ShellArgs a = ShellArgs
   { cmdName :: Text
@@ -82,6 +83,7 @@ data PABEffect (w :: Type) (r :: Type) where
   ListDirectory :: FilePath -> PABEffect w [FilePath]
   UploadDir :: Text -> PABEffect w ()
   QueryChainIndex :: ChainIndexQuery -> PABEffect w ChainIndexResponse
+  EstimateBudget :: FilePath -> PABEffect w (Either TxBudget.BudgetEstimationError TxBudget.TxBudget)
 
 handlePABEffect ::
   forall (w :: Type) (effs :: [Type -> Type]).
@@ -124,6 +126,8 @@ handlePABEffect contractEnv =
               void $ readProcess "scp" ["-r", Text.unpack dir, Text.unpack $ ipAddr <> ":$HOME"] ""
         QueryChainIndex query ->
           handleChainIndexReq contractEnv.cePABConfig query
+        EstimateBudget txPath -> 
+          TxBudget.estimateBudgetFile txPath
     )
 
 printLog' :: LogLevel -> LogLevel -> String -> IO ()
@@ -169,6 +173,13 @@ callCommand ::
   ShellArgs a ->
   Eff effs (Either Text a)
 callCommand = send @(PABEffect w) . CallCommand
+
+estimateBudget ::
+  forall (w :: Type) (a :: Type) (effs :: [Type -> Type]).
+  Member (PABEffect w) effs =>
+  FilePath  ->
+  Eff effs (Either TxBudget.BudgetEstimationError TxBudget.TxBudget)
+estimateBudget = send @(PABEffect w) . EstimateBudget
 
 createDirectoryIfMissing ::
   forall (w :: Type) (effs :: [Type -> Type]).

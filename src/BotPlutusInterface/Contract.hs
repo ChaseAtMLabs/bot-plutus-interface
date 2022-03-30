@@ -13,11 +13,11 @@ import BotPlutusInterface.Effects (
   printLog,
   queryChainIndex,
   threadDelay,
-  uploadDir,
+  uploadDir, estimateBudget
  )
-import BotPlutusInterface.Files (DummyPrivKey (FromSKey, FromVKey))
+import BotPlutusInterface.Files (DummyPrivKey (FromSKey, FromVKey), txFilePath)
 import BotPlutusInterface.Files qualified as Files
-import BotPlutusInterface.Types (ContractEnvironment (..), LogLevel (Debug, Warn), Tip (slot))
+import BotPlutusInterface.Types (ContractEnvironment (..), LogLevel (Debug, Warn, Notice, Error), Tip (slot))
 import Control.Lens ((^.))
 import Control.Monad (void)
 import Control.Monad.Freer (Eff, Member, interpret, reinterpret, runM, subsume, type (~>))
@@ -55,6 +55,9 @@ import Plutus.Contract.Types (Contract (..), ContractEffs)
 import PlutusTx.Builtins (fromBuiltin)
 import Wallet.Emulator.Error (WalletAPIError (..))
 import Prelude
+-- import BotPlutusInterface.TxBudget (estimateBudgetSigned)
+import Control.Arrow (left)
+import Control.Monad.Except.Extras (mapError)
 
 runContract ::
   forall (w :: Type) (s :: Row Type) (e :: Type) (a :: Type).
@@ -214,6 +217,11 @@ writeBalancedTx contractEnv (Right tx) = do
           , "Tx file: " <> Files.txFilePath pabConf "raw" tx
           , "Signatories (pkh): " <> Text.unwords (map pkhToText requiredSigners)
           ]
+
+    -- lift . printLog @w Error $ show tx
+    budgetRes <- firstEitherT (Text.pack . show) 
+          $ newEitherT $ estimateBudget @w (Text.unpack $ txFilePath pabConf "signed" tx)
+    lift . printLog @w Error $ "ExBudget: " ++ show budgetRes
 
     if not pabConf.pcDryRun && signable
       then secondEitherT (const tx) $ newEitherT $ CardanoCLI.submitTx @w pabConf tx

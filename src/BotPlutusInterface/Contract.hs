@@ -58,6 +58,7 @@ import Prelude
 -- import BotPlutusInterface.TxBudget (estimateBudgetSigned)
 import Control.Arrow (left)
 import Control.Monad.Except.Extras (mapError)
+import BotPlutusInterface.TxBudget (TxFile(Raw, Signed))
 
 runContract ::
   forall (w :: Type) (s :: Row Type) (e :: Type) (a :: Type).
@@ -219,9 +220,13 @@ writeBalancedTx contractEnv (Right tx) = do
           ]
 
     -- lift . printLog @w Error $ show tx
-    budgetRes <- firstEitherT (Text.pack . show) 
-          $ newEitherT $ estimateBudget @w (Text.unpack $ txFilePath pabConf "signed" tx)
-    lift . printLog @w Error $ "ExBudget: " ++ show budgetRes
+    rawBudgetRes <- firstEitherT (Text.pack . show) 
+          $ newEitherT $ estimateBudget @w (Raw $ Text.unpack $ txFilePath pabConf "raw" tx)
+    lift . printLog @w Error $ "\nExBudget Final RAW: " ++ show rawBudgetRes
+
+    signedBudgetRes <- firstEitherT (Text.pack . show) 
+          $ newEitherT $ estimateBudget @w (Signed $ Text.unpack $ txFilePath pabConf "signed" tx)
+    lift . printLog @w Error $ "\nExBudget Final SIGNED: " ++ show signedBudgetRes
 
     if not pabConf.pcDryRun && signable
       then secondEitherT (const tx) $ newEitherT $ CardanoCLI.submitTx @w pabConf tx

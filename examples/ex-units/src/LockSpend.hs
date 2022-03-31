@@ -102,8 +102,9 @@ mkValidator2 i _ _ ctx =
     then PP.traceIfFalse "looooooooooooong" check
     else PP.traceIfFalse "short" check
   where
-    info = scriptContextTxInfo ctx
-    check = PP.length (txInfoOutputs info) PP.== 1
+    check = True
+  --   info = scriptContextTxInfo ctx
+  --   check = PP.length (txInfoOutputs info) PP.== 1
 
 data TestLockSpend2
 

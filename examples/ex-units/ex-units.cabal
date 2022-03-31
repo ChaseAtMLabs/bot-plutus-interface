@@ -73,7 +73,10 @@ common common-lang
 
 library
   import:          common-lang
-  exposed-modules: LockSpend
+  exposed-modules: 
+    LockSpend
+    LockSpendSingle
+
   build-depends:
       plutus-ledger
     , containers

@@ -11,30 +11,40 @@ import Data.Text (Text)
 import Data.Text qualified as Text
 import System.Directory.Internal.Prelude (getEnv)
 import Prelude
+import Ledger (ExBudget (ExBudget), ExCPU (ExCPU), ExMemory (ExMemory))
+import Control.Applicative ((<|>))
 
 -- import BotPlutusInterface.Files (txFilePath)
 
-data EstimateType = FromFile {txPath :: FilePath}
+-- data EstimateType = FromFile {txPath :: FilePath}
 
 data BudgetEstimationError = BudgetEstimationError Text
   deriving stock (Show)
 
-estimateBudgetFile :: FilePath -> IO (Either BudgetEstimationError TxBudget)
-estimateBudgetFile txPath = do
+
+data TxFile
+  = Raw FilePath
+  | Signed FilePath
+
+
+
+estimateBudgetFile :: TxFile -> IO (Either BudgetEstimationError TxBudget)
+estimateBudgetFile txFile = do
   sock <- getEnv "CARDANO_NODE_SOCKET_PATH"
-
   let debugNodeInf = NodeInfo CAPI.Mainnet sock
+  txBody <- case txFile of
+              Raw rp -> deserialiseRaw rp
+              Signed sp -> fmap CAPI.getTxBody <$> deserialiseSigned sp
 
-  txRes <- deserialise txPath
   budgetRes <-
     either
       (pure . Left)
       (getExUnits debugNodeInf)
-      txRes
+      txBody
   return (toTxBudget <$> budgetRes)
 
-deserialise :: FilePath -> IO (Either BudgetEstimationError (CAPI.Tx CAPI.AlonzoEra))
-deserialise txFile = do
+deserialiseSigned :: FilePath -> IO (Either BudgetEstimationError (CAPI.Tx CAPI.AlonzoEra))
+deserialiseSigned txFile = do
   envlp <- readEnvelope
   return $ envlp >>= parseTx
   where
@@ -46,34 +56,58 @@ deserialise txFile = do
       left toBudgetError
         . CAPI.deserialiseFromTextEnvelope CAPI.AsAlonzoTx
 
-type ApiBudget = Map CAPI.ScriptWitnessIndex (Either CAPI.ScriptExecutionError CAPI.ExecutionUnits)
+
+deserialiseRaw :: FilePath -> IO (Either BudgetEstimationError (CAPI.TxBody CAPI.AlonzoEra))
+deserialiseRaw txFile = do
+  envlp <- readEnvelope
+  return $ envlp >>= parseTx
+  where
+    readEnvelope =
+      left toBudgetError
+        <$> CAPI.readTextEnvelopeFromFile txFile
+
+    parseTx =
+     (left toBudgetError
+        . CAPI.deserialiseFromTextEnvelope (CAPI.AsTxBody CAPI.AsAlonzoEra ))
+
+
+type ApiUnitsMap = Map CAPI.ScriptWitnessIndex (Either CAPI.ScriptExecutionError CAPI.ExecutionUnits)
+type ExBudgetsMap = Map CAPI.ScriptWitnessIndex (Either CAPI.ScriptExecutionError ExBudget )
 
 data TxBudget = TxBudget
-  { apiMap :: ApiBudget,
-    overallMax :: Either CAPI.ScriptExecutionError CAPI.ExecutionUnits
+  { exUnitsMap :: ApiUnitsMap,
+    exBudgetsMap :: ExBudgetsMap,
+    overallMax :: Either CAPI.ScriptExecutionError ExBudget,
+    overallSum :: Either CAPI.ScriptExecutionError ExBudget
   }
   deriving stock (Show)
 
-toTxBudget :: ApiBudget -> TxBudget
+toTxBudget :: ApiUnitsMap -> TxBudget
 toTxBudget bdg =
-  TxBudget bdg (calcOverall $ Map.elems bdg)
+  TxBudget bdg exBudgets overallMax' overallSum'
   where
-    calcOverall els =
-      foldl'
-        takeMaxUnits -- TODO: Is it really has to be like that, why not sum for both scripts?
-        (CAPI.ExecutionUnits 0 0)
-      <$> sequence els
+    exBudgets =  fmap unitsToBudget <$> bdg
 
-takeMaxUnits :: CAPI.ExecutionUnits -> CAPI.ExecutionUnits -> CAPI.ExecutionUnits
-takeMaxUnits (CAPI.ExecutionUnits s1 m1) (CAPI.ExecutionUnits s2 m2) =
-  CAPI.ExecutionUnits (max s1 s2) (max m1 m2)
+    eitherBudgets :: Either CAPI.ScriptExecutionError [ExBudget]
+    eitherBudgets = sequence $ Map.elems exBudgets
+
+    overallSum' = mconcat <$> eitherBudgets
+    overallMax' = foldl' takeMax mempty <$> eitherBudgets
+
+takeMax :: ExBudget -> ExBudget -> ExBudget
+takeMax (ExBudget s1 m1) (ExBudget s2 m2) =
+  ExBudget (max s1 s2) (max m1 m2)
+
+unitsToBudget (CAPI.ExecutionUnits cpu mem) =
+    ExBudget (ExCPU $ cast cpu)  (ExMemory $ cast mem)
+  where
+    cast = fromInteger . toInteger
 
 getExUnits ::
   NodeInfo ->
-  CAPI.Tx CAPI.AlonzoEra ->
-  IO (Either BudgetEstimationError ApiBudget)
-getExUnits nodeInf tx = do
-  let txBody = CAPI.getTxBody tx
+  CAPI.TxBody CAPI.AlonzoEra ->
+  IO (Either BudgetEstimationError ApiUnitsMap)
+getExUnits nodeInf txBody = do
   sysStart <- QueryNode.systemStart nodeInf
   eraHist <- QueryNode.eraHistory nodeInf
   pparams <- QueryNode.protocolParams nodeInf

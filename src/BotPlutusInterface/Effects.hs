@@ -49,6 +49,7 @@ import System.Exit (ExitCode (ExitFailure, ExitSuccess))
 import System.Process (readProcess, readProcessWithExitCode)
 import Prelude hiding (readFile)
 import BotPlutusInterface.TxBudget qualified as TxBudget
+import BotPlutusInterface.TxBudget (TxFile)
 
 data ShellArgs a = ShellArgs
   { cmdName :: Text
@@ -83,7 +84,7 @@ data PABEffect (w :: Type) (r :: Type) where
   ListDirectory :: FilePath -> PABEffect w [FilePath]
   UploadDir :: Text -> PABEffect w ()
   QueryChainIndex :: ChainIndexQuery -> PABEffect w ChainIndexResponse
-  EstimateBudget :: FilePath -> PABEffect w (Either TxBudget.BudgetEstimationError TxBudget.TxBudget)
+  EstimateBudget :: TxFile -> PABEffect w (Either TxBudget.BudgetEstimationError TxBudget.TxBudget)
 
 handlePABEffect ::
   forall (w :: Type) (effs :: [Type -> Type]).
@@ -177,7 +178,7 @@ callCommand = send @(PABEffect w) . CallCommand
 estimateBudget ::
   forall (w :: Type) (a :: Type) (effs :: [Type -> Type]).
   Member (PABEffect w) effs =>
-  FilePath  ->
+  TxFile  ->
   Eff effs (Either TxBudget.BudgetEstimationError TxBudget.TxBudget)
 estimateBudget = send @(PABEffect w) . EstimateBudget
 

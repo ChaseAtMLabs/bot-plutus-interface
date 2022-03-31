@@ -7,16 +7,16 @@ module BotPlutusInterface.Balance (
 ) where
 
 import BotPlutusInterface.CardanoCLI qualified as CardanoCLI
-import BotPlutusInterface.Effects (PABEffect, createDirectoryIfMissingCLI, printLog)
-import BotPlutusInterface.Files (DummyPrivKey, unDummyPrivateKey)
+import BotPlutusInterface.Effects (PABEffect, createDirectoryIfMissingCLI, printLog, estimateBudget)
+import BotPlutusInterface.Files (DummyPrivKey, unDummyPrivateKey, txFilePath)
 import BotPlutusInterface.Files qualified as Files
-import BotPlutusInterface.Types (LogLevel (Debug), PABConfig)
+import BotPlutusInterface.Types (LogLevel (Debug, Error), PABConfig)
 import Cardano.Api (ExecutionUnitPrices (ExecutionUnitPrices))
 import Cardano.Api.Shelley (ProtocolParameters (protocolParamPrices))
 import Control.Monad (foldM, void, zipWithM)
 import Control.Monad.Freer (Eff, Member)
 import Control.Monad.Trans.Class (lift)
-import Control.Monad.Trans.Either (EitherT, hoistEither, newEitherT, runEitherT)
+import Control.Monad.Trans.Either (EitherT, hoistEither, newEitherT, runEitherT, firstEitherT)
 import Data.Coerce (coerce)
 import Data.Either.Combinators (rightToMaybe)
 import Data.Kind (Type)
@@ -59,6 +59,8 @@ import Plutus.V1.Ledger.Api (
   TokenName (..),
  )
 import Prelude
+import Data.Either (fromRight)
+import BotPlutusInterface.TxBudget
 
 {- | Collect necessary tx inputs and collaterals, add minimum lovelace values and balance non ada
  assets
@@ -132,8 +134,27 @@ balanceTxIO pabConf ownPkh unbalancedTx =
       txWithoutFees <-
         hoistEither $ balanceTxStep minUtxos utxoIndex ownPkh $ tx `withFee` 0
 
-      exBudget <- newEitherT $ CardanoCLI.buildTx @w pabConf privKeys txWithoutFees
+      (txFile, derivedOrForcedBudget) <- newEitherT $ CardanoCLI.buildTx @w pabConf privKeys txWithoutFees
+
+      lift $ printLog @w Error $ "Tx File: " ++ txFile
+      estimatedBudget <- firstEitherT (Text.pack . show) 
+                            $ newEitherT $ estimateBudget @w (Raw txFile)
+      
+      lift $ printLog @w Error $ "\nBALANCING STEP"
+      lift $ printLog @w Error $ "-> Derived or forced budget Balancing:\n--> " ++ show derivedOrForcedBudget
+      lift $ printLog @w Error $ "=> Api est budget Balancing:" 
+                                 ++ "\n==> sum: " ++ show (overallSum estimatedBudget)
+                                 ++ "\n==> max: " ++ show (overallMax estimatedBudget)
+                                 ++ "\n==> all: " ++ show estimatedBudget
+          
+      
+      -- let exBudget = either (error . show) id (overallSum estimatedBudget)
+      let exBudget = derivedOrForcedBudget  
+
+      
       nonBudgettedFees <- newEitherT $ CardanoCLI.calculateMinFee @w pabConf txWithoutFees
+
+      
 
       let fees = nonBudgettedFees + getBudgetPrice (getExecutionUnitPrices pabConf) exBudget
 

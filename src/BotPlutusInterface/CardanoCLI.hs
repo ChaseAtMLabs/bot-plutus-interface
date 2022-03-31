@@ -261,14 +261,17 @@ buildTx ::
   PABConfig ->
   Map PubKeyHash DummyPrivKey ->
   Tx ->
-  Eff effs (Either Text ExBudget)
+  Eff effs (Either Text (FilePath, ExBudget ))
 buildTx pabConf privKeys tx = do
+  let txFile = txFilePath pabConf "raw" tx
   eTxInfo <- buildTxInfo @w pabConf tx
   case eTxInfo of
     Right txInfo -> do
       let (ins, valBudget) = txInOpts pabConf txInfo (txInputs tx)
           (mints, mintBudget) = mintOpts pabConf txInfo (txMintScripts tx) (txRedeemers tx) (txMint tx)
-      callCommand @w $ ShellArgs "cardano-cli" (opts ins mints) (const $ valBudget <> mintBudget)
+      callCommand @w $ ShellArgs "cardano-cli" 
+                        (opts ins mints txFile) 
+                        (const $ (Text.unpack txFile, valBudget <> mintBudget))
     Left e -> return $ Left e
   where
     requiredSigners =
@@ -284,7 +287,7 @@ buildTx pabConf privKeys tx = do
                     []
         )
         (Map.keys (Ledger.txSignatures tx))
-    opts ins mints =
+    opts ins mints txFile =
       mconcat
         [ ["transaction", "build-raw", "--alonzo-era"]
         , ins
@@ -296,7 +299,7 @@ buildTx pabConf privKeys tx = do
         , ["--fee", showText . getLovelace . fromValue $ txFee tx]
         , mconcat
             [ ["--protocol-params-file", pabConf.pcProtocolParamsFile]
-            , ["--out-file", txFilePath pabConf "raw" tx]
+            , ["--out-file", txFile]
             ]
         ]
 
@@ -370,7 +373,7 @@ txInOpts pabConf txInfo =
           let scriptContext = ScriptContext txInfo $ Plutus.Spending txOutRef
               exBudget =
                 budgetFromConfig pabConf $
-                  fromRight mempty $
+                  fromRight mempty $ -- ! calculate of set to None in PABConfig
                     calculateExBudget
                       pabConf
                       (Scripts.unValidatorScript validator)
@@ -391,7 +394,7 @@ txInOpts pabConf txInfo =
                     ]
                   ,
                     [ "--tx-in-execution-units"
-                    , exBudgetToCliArg exBudget
+                    , exBudgetToCliArg $ trace ("\nIns budget:" ++ show exBudget) exBudget
                     ]
                   ]
         Just ConsumePublicKeyAddress -> mempty
@@ -413,7 +416,7 @@ mintOpts pabConf txInfo mintingPolicies redeemers mintValue =
                   curSymbol = Value.mpsSymbol $ Scripts.mintingPolicyHash policy
                   scriptContext = ScriptContext txInfo $ Plutus.Minting curSymbol
                   exBudget r =
-                    budgetFromConfig pabConf $
+                    budgetFromConfig pabConf $ -- ! calculate of set to None in PABConfig
                       fromRight mempty $
                         calculateExBudget
                           pabConf

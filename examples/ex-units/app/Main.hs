@@ -17,6 +17,7 @@ import Data.Text qualified as Text
 import Data.UUID.V4 qualified as UUID
 import Ledger (PubKeyHash)
 import LockSpend (lockThenSpend)
+import LockSpendSingle (lockThenSpendSingle)
 import Plutus.PAB.Core.ContractInstance.STM (Activity (Active))
 import Servant.Client (BaseUrl (BaseUrl), Scheme (Http))
 import System.Directory (listDirectory)
@@ -35,6 +36,7 @@ main = do
 
   cEnv <- mkContractEnv nodeInfo clusterDir
   res <- BPI.runContract cEnv lockThenSpend 
+  -- res <- BPI.runContract cEnv lockThenSpendSingle
   putStrLn $ case res of
       Right _ -> "=== OK ==="
       Left e -> "=== FAILED ===\n" ++ show e 
@@ -76,7 +78,8 @@ mkPabConf pparams pparamsFile clusterDir ownPkh =
       pcDryRun = False,
       pcLogLevel = Error,
       pcProtocolParamsFile = pparamsFile,
-      pcForceBudget = Just (228371873, 527318),
+      -- pcForceBudget = Just (217646018, 492414),
+      pcForceBudget = Nothing,
       pcEnableTxEndpoint = True
     }
 

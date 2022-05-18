@@ -1,0 +1,128 @@
+@@ MAX BUDGET: ExBudget
+  { exBudgetCPU = ExCPU 10000000000
+  , exBudgetMemory = ExMemory 10000000
+  }
+Cardano.API:
+TxBudget
+  { spendBudgets =
+      fromList
+        [ ( TxOutRef
+              { txOutRefId =
+                  b7a61b0b8ef6a8d7ab79bff58ee0058dda95844468c25cf73ce930c96c078818
+              , txOutRefIdx = 1
+              }
+          , ExBudget
+              { exBudgetCPU = ExCPU 447691910
+              , exBudgetMemory = ExMemory 1131702
+              }
+          )
+        , ( TxOutRef
+              { txOutRefId =
+                  b7a61b0b8ef6a8d7ab79bff58ee0058dda95844468c25cf73ce930c96c078818
+              , txOutRefIdx = 2
+              }
+          , ExBudget
+              { exBudgetCPU = ExCPU 322779192
+              , exBudgetMemory = ExMemory 728242
+              }
+          )
+        ]
+  , mintBudgets =
+      fromList
+        [ ( 2737ade81ae0bf32284fa14acdedd60ec1588460e57870ef1eff9495
+          , ExBudget
+              { exBudgetCPU = ExCPU 467150375
+              , exBudgetMemory = ExMemory 1201232
+              }
+          )
+        , ( cad39dafac141ab69720ed17fcc5e2ce8654dfa10cd2d72d75a57ded
+          , ExBudget
+              { exBudgetCPU = ExCPU 356113074
+              , exBudgetMemory = ExMemory 845468
+              }
+          )
+        ]
+  }
+Plutus:
+TxBudget
+  { spendBudgets =
+      fromList
+        [ ( TxOutRef
+              { txOutRefId =
+                  b7a61b0b8ef6a8d7ab79bff58ee0058dda95844468c25cf73ce930c96c078818
+              , txOutRefIdx = 1
+              }
+          , ExBudget
+              { exBudgetCPU = ExCPU 440110273
+              , exBudgetMemory = ExMemory 1114258
+              }
+          )
+        , ( TxOutRef
+              { txOutRefId =
+                  b7a61b0b8ef6a8d7ab79bff58ee0058dda95844468c25cf73ce930c96c078818
+              , txOutRefIdx = 2
+              }
+          , ExBudget
+              { exBudgetCPU = ExCPU 315197555
+              , exBudgetMemory = ExMemory 710798
+              }
+          )
+        ]
+  , mintBudgets =
+      fromList
+        [ ( 2737ade81ae0bf32284fa14acdedd60ec1588460e57870ef1eff9495
+          , ExBudget
+              { exBudgetCPU = ExCPU 454429005
+              , exBudgetMemory = ExMemory 1166986
+              }
+          )
+        , ( cad39dafac141ab69720ed17fcc5e2ce8654dfa10cd2d72d75a57ded
+          , ExBudget
+              { exBudgetCPU = ExCPU 348531437
+              , exBudgetMemory = ExMemory 828024
+              }
+          )
+        ]
+  }
+Custom:
+TxBudget
+  { spendBudgets =
+      fromList
+        [ ( TxOutRef
+              { txOutRefId =
+                  b7a61b0b8ef6a8d7ab79bff58ee0058dda95844468c25cf73ce930c96c078818
+              , txOutRefIdx = 1
+              }
+          , ExBudget
+              { exBudgetCPU = ExCPU 447691910
+              , exBudgetMemory = ExMemory 1131702
+              }
+          )
+        , ( TxOutRef
+              { txOutRefId =
+                  b7a61b0b8ef6a8d7ab79bff58ee0058dda95844468c25cf73ce930c96c078818
+              , txOutRefIdx = 2
+              }
+          , ExBudget
+              { exBudgetCPU = ExCPU 322779192
+              , exBudgetMemory = ExMemory 728242
+              }
+          )
+        ]
+  , mintBudgets =
+      fromList
+        [ ( 2737ade81ae0bf32284fa14acdedd60ec1588460e57870ef1eff9495
+          , ExBudget
+              { exBudgetCPU = ExCPU 467150375
+              , exBudgetMemory = ExMemory 1201232
+              }
+          )
+        , ( cad39dafac141ab69720ed17fcc5e2ce8654dfa10cd2d72d75a57ded
+          , ExBudget
+              { exBudgetCPU = ExCPU 356113074
+              , exBudgetMemory = ExMemory 845468
+              }
+          )
+        ]
+  }
+  

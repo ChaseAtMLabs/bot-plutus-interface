@@ -2,6 +2,7 @@ module BotPlutusInterface.TimeSlot (
   TimeSlotConversionError,
   slotToPOSIXTimeImpl,
   posixTimeToSlotImpl,
+  posixTimeRangeToContainedSlotRangeImpl,
 ) where
 
 import Cardano.Ledger.Alonzo.TxInfo (slotToPOSIXTime)
@@ -23,10 +24,13 @@ import Data.Text qualified as Text
 import Ouroboros.Consensus.HardFork.History qualified as Consensus
 import System.Environment (getEnv)
 
-import Cardano.Slotting.Time (RelativeTime, toRelativeTime)
-import Data.Time (secondsToNominalDiffTime)
+import Cardano.Slotting.Time (RelativeTime, toRelativeTime, SlotLength (getSlotLength), slotLengthToSec, slotLengthToMillisec)
+import Data.Time (secondsToNominalDiffTime, nominalDiffTimeToSeconds)
 import Data.Time.Clock.POSIX (posixSecondsToUTCTime)
 import Ouroboros.Consensus.HardFork.History.Qry qualified as HF
+import Ledger (Interval(Interval), Extended (Finite, NegInf, PosInf), LowerBound (LowerBound), UpperBound (UpperBound), Closure)
+import Debug.Trace (traceM)
+import Data.Fixed (resolution)
 
 data TimeSlotConversionError
   = TimeSlotConversionError !Text
@@ -42,10 +46,19 @@ slotToPOSIXTimeImpl pabConf (Ledger.Slot s) = runEitherT $ do
   sock <- liftIO $ getEnv "CARDANO_NODE_SOCKET_PATH"
   let nodeInfo = NodeInfo (pcNetwork pabConf) sock
 
-  epochInfo <- toLedgerEpochInfo <$> newET (queryEraHistory nodeInfo)
+  eraHsitory <- newET (queryEraHistory nodeInfo)
+  
   sysStart <- newET $ querySystemStart nodeInfo
 
   let slotNo = CAPI.SlotNo $ fromInteger s
+      epochInfo = toLedgerEpochInfo eraHsitory
+
+  (relativeTime, slotLength) <- 
+      firstEitherT toError $
+        hoistEither $ CAPI.getProgress slotNo eraHsitory
+
+  traceM $ "Slot length: " ++ show (Ledger.POSIXTime $ slotLengthToMillisec slotLength)
+
   firstEitherT toError $
     hoistEither $
       slotToPOSIXTime pparams epochInfo sysStart slotNo
@@ -74,7 +87,7 @@ posixTimeToSlotImpl pabConf pTime = runEitherT $ do
   where
     toUtc (Ledger.POSIXTime milliseconds) =
       posixSecondsToUTCTime $
-        secondsToNominalDiffTime 
+        secondsToNominalDiffTime
           (fromInteger $ milliseconds `div` 1000) -- FIXME: is it safe?
 
 newET :: Show e => IO (Either e a) -> EitherT TimeSlotConversionError IO a
@@ -82,3 +95,49 @@ newET = firstEitherT toError . newEitherT
 
 toError :: Show e => e -> TimeSlotConversionError
 toError = TimeSlotConversionError . Text.pack . show
+
+posixTimeRangeToContainedSlotRangeImpl ::
+  PABConfig  ->
+  Ledger.POSIXTimeRange ->
+  IO (Either TimeSlotConversionError Ledger.SlotRange)
+posixTimeRangeToContainedSlotRangeImpl 
+  pabConf 
+  ptr@(Interval (LowerBound start startIncl) (UpperBound end endIncl)) = runEitherT $ do
+
+  startSlot <- newET $ convertExtended start
+  startSlotClosure <- getClosure startSlot startIncl
+
+  endSlot <- newET $ convertExtended end
+  endSlotClosure <- getClosure endSlot endIncl
+
+
+  let lowerB = LowerBound startSlot startSlotClosure
+      upperB = UpperBound endSlot endSlotClosure
+  
+  pure $ Interval lowerB upperB
+  where
+    toSlot pTime = 
+      posixTimeToSlotImpl pabConf pTime
+
+    convertExtended :: Extended Ledger.POSIXTime -> IO (Either TimeSlotConversionError (Extended Ledger.Slot))
+    convertExtended = \case
+      Finite pTime -> fmap Finite <$> toSlot pTime
+      NegInf -> pure $ Right NegInf
+      PosInf -> pure $ Right PosInf
+
+    getClosure :: Extended Ledger.Slot -> Closure -> EitherT TimeSlotConversionError IO Bool
+    getClosure exSlot currentClosure = case exSlot of
+      Finite slot -> do 
+          slotsTime <- newEitherT $ slotToPOSIXTimeImpl pabConf slot
+          pure $ slotsTime `Ledger.member` ptr
+
+      NegInf -> pure currentClosure
+      PosInf -> pure currentClosure
+        
+
+-- posixTimeRangeToContainedSlotRange :: SlotConfig -> POSIXTimeRange -> SlotRange
+-- posixTimeRangeToContainedSlotRange sc ptr = case fmap (posixTimeToEnclosingSlot sc) ptr of
+--   Interval (LowerBound start startIncl) (UpperBound end endIncl) ->
+--     Interval
+--       (LowerBound start (case start of Finite s -> slotToBeginPOSIXTime sc s `member` ptr; _ -> startIncl))
+--       (UpperBound end (case end of Finite e -> slotToEndPOSIXTime sc e `member` ptr; _ -> endIncl))
